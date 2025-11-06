@@ -1,0 +1,5 @@
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+protobuf>=4.25.0
+watchdog>=3.0.0
+asyncio==4.0.0
