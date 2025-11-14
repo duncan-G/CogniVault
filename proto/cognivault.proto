@@ -9,6 +9,9 @@ service CogniVaultService {
   
   // Example method for processing data
   rpc ProcessData (ProcessDataRequest) returns (ProcessDataResponse);
+  
+  // Process chat history using InputProcessor and return ModelBatchInput
+  rpc ProcessInput (ProcessInputRequest) returns (ProcessInputResponse);
 }
 
 // Request/Response messages
@@ -27,8 +30,92 @@ message ProcessDataRequest {
 }
 
 message ProcessDataResponse {
-  string result = 1;
-  bool success = 2;
-  string message = 3;
+  string result = 1;  // JSON string containing processing results
+}
+
+// ProcessInput messages for InputProcessor
+message ProcessInputRequest {
+  ChatHistory chat_history = 1;
+}
+
+message ProcessInputResponse {
+  bool success = 1;
+  string error_message = 2;
+  ModelBatchInput batch_input = 3;
+}
+
+// ChatHistory structure
+message ChatHistory {
+  string id = 1;  // UUID as string
+  repeated Message messages = 2;
+  map<string, string> metadata = 3;
+}
+
+// Message structure
+message Message {
+  string role = 1;  // "user", "assistant", "system"
+  oneof content {
+    TextContent text_content = 2;
+    AudioContent audio_content = 3;
+  }
+  string recipient = 4;  // Optional recipient for assistant messages
+}
+
+// Text content
+message TextContent {
+  string text = 1;
+}
+
+// Audio content
+message AudioContent {
+  string audio_url = 1;  // URL or filepath, or "placeholder" or ""
+  string raw_audio = 2;  // Base64-encoded audio bytes (optional)
+}
+
+// ModelBatchInput structure - serialized tensor data
+message ModelBatchInput {
+  // input_ids: shape (bsz, seq_len)
+  TensorData input_ids = 1;
+  
+  // attention_mask: shape (bsz, seq_len)
+  TensorData attention_mask = 2;
+  
+  // audio_features: shape (num_audio_in, feature_dim, max_mel_seq_len)
+  TensorData audio_features = 3;
+  
+  // audio_feature_attention_mask: shape (num_audio_in, max_mel_seq_len)
+  TensorData audio_feature_attention_mask = 4;
+  
+  // audio_out_ids: shape (num_codebooks, audio_out_total_length)
+  TensorData audio_out_ids = 5;
+  
+  // audio_out_ids_start: shape (num_audio_out,)
+  TensorData audio_out_ids_start = 6;
+  
+  // audio_out_ids_start_group_loc: shape (num_audio_out,)
+  TensorData audio_out_ids_start_group_loc = 7;
+  
+  // audio_in_ids: shape (num_codebooks, audio_in_total_length)
+  TensorData audio_in_ids = 8;
+  
+  // audio_in_ids_start: shape (num_audio_in,)
+  TensorData audio_in_ids_start = 9;
+  
+  // label_ids: shape (bsz, seq_len)
+  TensorData label_ids = 10;
+  
+  // label_audio_ids: shape (num_codebooks, audio_out_total_length)
+  TensorData label_audio_ids = 11;
+  
+  float reward = 12;  // Optional reward value
+}
+
+// Tensor data serialization
+message TensorData {
+  repeated int64 shape = 1;  // Tensor shape dimensions
+  repeated int64 int64_data = 2;  // For LongTensor (int64)
+  repeated float float_data = 3;  // For FloatTensor
+  bytes raw_data = 4;  // Alternative: raw bytes representation
+  string dtype = 5;  // Data type: "int64", "float32", etc.
 }
 

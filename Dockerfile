@@ -19,14 +19,11 @@ COPY proto/ ./proto/
 # Generate Python code from proto files
 RUN python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. proto/cognivault.proto
 
-# Copy server code
-COPY server.py .
-
 # Create proto package init file if it doesn't exist
 RUN touch proto/__init__.py
 
-# Expose gRPC port
-EXPOSE 50052
+# Expose gRPC port and debugpy port
+EXPOSE 50051 5678
 
 # Copy watch server
 COPY watch_server.py .

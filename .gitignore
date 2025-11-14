@@ -32,6 +32,7 @@ env/
 *.swp
 *.swo
 *~
+.devcontainer/
 
 # Generated proto files (optional - you may want to include these)
 # proto/*_pb2.py
@@ -48,3 +49,5 @@ env/
 .DS_Store
 Thumbs.db
 
+# Pretrained models
+.models/

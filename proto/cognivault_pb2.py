@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16proto/cognivault.proto\x12\ncognivault\"\x1e\n\x0bPingRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\"3\n\x0cPingResponse\x12\x10\n\x08response\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\"\x93\x01\n\x12ProcessDataRequest\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.cognivault.ProcessDataRequest.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"G\n\x13ProcessDataResponse\x12\x0e\n\x06result\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t2\x9e\x01\n\x11\x43ogniVaultService\x12\x39\n\x04Ping\x12\x17.cognivault.PingRequest\x1a\x18.cognivault.PingResponse\x12N\n\x0bProcessData\x12\x1e.cognivault.ProcessDataRequest\x1a\x1f.cognivault.ProcessDataResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x16proto/cognivault.proto\x12\ncognivault\"\x1e\n\x0bPingRequest\x12\x0f\n\x07message\x18\x01 \x01(\t\"3\n\x0cPingResponse\x12\x10\n\x08response\x18\x01 \x01(\t\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\"\x93\x01\n\x12ProcessDataRequest\x12\x0c\n\x04\x64\x61ta\x18\x01 \x01(\t\x12>\n\x08metadata\x18\x02 \x03(\x0b\x32,.cognivault.ProcessDataRequest.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"%\n\x13ProcessDataResponse\x12\x0e\n\x06result\x18\x01 \x01(\t\"D\n\x13ProcessInputRequest\x12-\n\x0c\x63hat_history\x18\x01 \x01(\x0b\x32\x17.cognivault.ChatHistory\"p\n\x14ProcessInputResponse\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x15\n\rerror_message\x18\x02 \x01(\t\x12\x30\n\x0b\x62\x61tch_input\x18\x03 \x01(\x0b\x32\x1b.cognivault.ModelBatchInput\"\xaa\x01\n\x0b\x43hatHistory\x12\n\n\x02id\x18\x01 \x01(\t\x12%\n\x08messages\x18\x02 \x03(\x0b\x32\x13.cognivault.Message\x12\x37\n\x08metadata\x18\x03 \x03(\x0b\x32%.cognivault.ChatHistory.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x99\x01\n\x07Message\x12\x0c\n\x04role\x18\x01 \x01(\t\x12/\n\x0ctext_content\x18\x02 \x01(\x0b\x32\x17.cognivault.TextContentH\x00\x12\x31\n\raudio_content\x18\x03 \x01(\x0b\x32\x18.cognivault.AudioContentH\x00\x12\x11\n\trecipient\x18\x04 \x01(\tB\t\n\x07\x63ontent\"\x1b\n\x0bTextContent\x12\x0c\n\x04text\x18\x01 \x01(\t\"4\n\x0c\x41udioContent\x12\x11\n\taudio_url\x18\x01 \x01(\t\x12\x11\n\traw_audio\x18\x02 \x01(\t\"\xcb\x04\n\x0fModelBatchInput\x12)\n\tinput_ids\x18\x01 \x01(\x0b\x32\x16.cognivault.TensorData\x12.\n\x0e\x61ttention_mask\x18\x02 \x01(\x0b\x32\x16.cognivault.TensorData\x12.\n\x0e\x61udio_features\x18\x03 \x01(\x0b\x32\x16.cognivault.TensorData\x12<\n\x1c\x61udio_feature_attention_mask\x18\x04 \x01(\x0b\x32\x16.cognivault.TensorData\x12-\n\raudio_out_ids\x18\x05 \x01(\x0b\x32\x16.cognivault.TensorData\x12\x33\n\x13\x61udio_out_ids_start\x18\x06 \x01(\x0b\x32\x16.cognivault.TensorData\x12=\n\x1d\x61udio_out_ids_start_group_loc\x18\x07 \x01(\x0b\x32\x16.cognivault.TensorData\x12,\n\x0c\x61udio_in_ids\x18\x08 \x01(\x0b\x32\x16.cognivault.TensorData\x12\x32\n\x12\x61udio_in_ids_start\x18\t \x01(\x0b\x32\x16.cognivault.TensorData\x12)\n\tlabel_ids\x18\n \x01(\x0b\x32\x16.cognivault.TensorData\x12/\n\x0flabel_audio_ids\x18\x0b \x01(\x0b\x32\x16.cognivault.TensorData\x12\x0e\n\x06reward\x18\x0c \x01(\x02\"d\n\nTensorData\x12\r\n\x05shape\x18\x01 \x03(\x03\x12\x12\n\nint64_data\x18\x02 \x03(\x03\x12\x12\n\nfloat_data\x18\x03 \x03(\x02\x12\x10\n\x08raw_data\x18\x04 \x01(\x0c\x12\r\n\x05\x64type\x18\x05 \x01(\t2\xf1\x01\n\x11\x43ogniVaultService\x12\x39\n\x04Ping\x12\x17.cognivault.PingRequest\x1a\x18.cognivault.PingResponse\x12N\n\x0bProcessData\x12\x1e.cognivault.ProcessDataRequest\x1a\x1f.cognivault.ProcessDataResponse\x12Q\n\x0cProcessInput\x12\x1f.cognivault.ProcessInputRequest\x1a .cognivault.ProcessInputResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,6 +33,8 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_PROCESSDATAREQUEST_METADATAENTRY']._loaded_options = None
   _globals['_PROCESSDATAREQUEST_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_CHATHISTORY_METADATAENTRY']._loaded_options = None
+  _globals['_CHATHISTORY_METADATAENTRY']._serialized_options = b'8\001'
   _globals['_PINGREQUEST']._serialized_start=38
   _globals['_PINGREQUEST']._serialized_end=68
   _globals['_PINGRESPONSE']._serialized_start=70
@@ -42,7 +44,25 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_PROCESSDATAREQUEST_METADATAENTRY']._serialized_start=224
   _globals['_PROCESSDATAREQUEST_METADATAENTRY']._serialized_end=271
   _globals['_PROCESSDATARESPONSE']._serialized_start=273
-  _globals['_PROCESSDATARESPONSE']._serialized_end=344
-  _globals['_COGNIVAULTSERVICE']._serialized_start=347
-  _globals['_COGNIVAULTSERVICE']._serialized_end=505
+  _globals['_PROCESSDATARESPONSE']._serialized_end=310
+  _globals['_PROCESSINPUTREQUEST']._serialized_start=312
+  _globals['_PROCESSINPUTREQUEST']._serialized_end=380
+  _globals['_PROCESSINPUTRESPONSE']._serialized_start=382
+  _globals['_PROCESSINPUTRESPONSE']._serialized_end=494
+  _globals['_CHATHISTORY']._serialized_start=497
+  _globals['_CHATHISTORY']._serialized_end=667
+  _globals['_CHATHISTORY_METADATAENTRY']._serialized_start=224
+  _globals['_CHATHISTORY_METADATAENTRY']._serialized_end=271
+  _globals['_MESSAGE']._serialized_start=670
+  _globals['_MESSAGE']._serialized_end=823
+  _globals['_TEXTCONTENT']._serialized_start=825
+  _globals['_TEXTCONTENT']._serialized_end=852
+  _globals['_AUDIOCONTENT']._serialized_start=854
+  _globals['_AUDIOCONTENT']._serialized_end=906
+  _globals['_MODELBATCHINPUT']._serialized_start=909
+  _globals['_MODELBATCHINPUT']._serialized_end=1496
+  _globals['_TENSORDATA']._serialized_start=1498
+  _globals['_TENSORDATA']._serialized_end=1598
+  _globals['_COGNIVAULTSERVICE']._serialized_start=1601
+  _globals['_COGNIVAULTSERVICE']._serialized_end=1842
 # @@protoc_insertion_point(module_scope)

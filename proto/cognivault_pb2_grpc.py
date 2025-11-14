@@ -45,6 +45,11 @@ class CogniVaultServiceStub(object):
                 request_serializer=proto_dot_cognivault__pb2.ProcessDataRequest.SerializeToString,
                 response_deserializer=proto_dot_cognivault__pb2.ProcessDataResponse.FromString,
                 _registered_method=True)
+        self.ProcessInput = channel.unary_unary(
+                '/cognivault.CogniVaultService/ProcessInput',
+                request_serializer=proto_dot_cognivault__pb2.ProcessInputRequest.SerializeToString,
+                response_deserializer=proto_dot_cognivault__pb2.ProcessInputResponse.FromString,
+                _registered_method=True)
 
 
 class CogniVaultServiceServicer(object):
@@ -65,6 +70,13 @@ class CogniVaultServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ProcessInput(self, request, context):
+        """Process chat history using InputProcessor and return ModelBatchInput
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_CogniVaultServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -77,6 +89,11 @@ def add_CogniVaultServiceServicer_to_server(servicer, server):
                     servicer.ProcessData,
                     request_deserializer=proto_dot_cognivault__pb2.ProcessDataRequest.FromString,
                     response_serializer=proto_dot_cognivault__pb2.ProcessDataResponse.SerializeToString,
+            ),
+            'ProcessInput': grpc.unary_unary_rpc_method_handler(
+                    servicer.ProcessInput,
+                    request_deserializer=proto_dot_cognivault__pb2.ProcessInputRequest.FromString,
+                    response_serializer=proto_dot_cognivault__pb2.ProcessInputResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -134,6 +151,33 @@ class CogniVaultService(object):
             '/cognivault.CogniVaultService/ProcessData',
             proto_dot_cognivault__pb2.ProcessDataRequest.SerializeToString,
             proto_dot_cognivault__pb2.ProcessDataResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ProcessInput(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/cognivault.CogniVaultService/ProcessInput',
+            proto_dot_cognivault__pb2.ProcessInputRequest.SerializeToString,
+            proto_dot_cognivault__pb2.ProcessInputResponse.FromString,
             options,
             channel_credentials,
             insecure,
