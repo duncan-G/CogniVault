@@ -125,6 +125,9 @@ class HiggsAudioTokenizer(nn.Module):
             )
 
         self.audio_tokenizer_feature_extractor = HiggsAudioFeatureExtractor(sampling_rate=self.sample_rate)
+        
+        # Move all model components to the specified device
+        self.to(device)
 
     @property
     def tps(self):
@@ -261,6 +264,8 @@ class HiggsAudioTokenizer(nn.Module):
                 import warnings
                 warnings.warn(f"Non-critical weights were not loaded: {real_missing[:5]}... (Total: {len(real_missing)})")
 
+        # Ensure model is on the correct device (in case state_dict loading affected device placement)
+        model.to(device)
         model.eval()
         return model
 
