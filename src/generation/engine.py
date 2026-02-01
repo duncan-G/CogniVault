@@ -111,7 +111,7 @@ class AudioEngine:
             try:
                 input_start = perf_counter()
                 input = self.input_processor.process_chat(chat)
-                batch = self.data_collator.collate_chats([input])
+                batch = self.data_collator([input])
                 input_duration_ms = (perf_counter() - input_start) * 1000
                 prompt_token_count = int(batch.input_ids.shape[-1])
 
