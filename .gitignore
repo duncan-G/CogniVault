@@ -55,5 +55,6 @@ Thumbs.db
 # Local audio outputs
 scripts/audio_outputs/
 
-# SSH keys
+# SSH keys and helper script
 *.pem
+.ssh.sh

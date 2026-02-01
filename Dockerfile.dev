@@ -13,9 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
 
-# Copy the project code
-COPY . .
-
 # Default to an interactive shell so you can exec and run scripts manually.
 # Override CMD in `docker run` if you want a specific script.
 CMD ["/bin/bash"]
