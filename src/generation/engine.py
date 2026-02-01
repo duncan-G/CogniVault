@@ -290,7 +290,7 @@ class AudioEngine:
 
     def _create_chat_processor(self):
         return ChatProcessor(
-            tokenizer=self.tokenizer,
+            text_tokenizer=self.tokenizer,
             audio_tokenizer=self.audio_tokenizer,
             device=self.device
         )
