@@ -425,9 +425,9 @@ class HiggsAudioDataCollator:
                     # Add audio-stream BOS/EOS tokens around each code sequence.
                     audio_codes = torch.cat(
                         [
-                            torch.full((ele.shape[0], 1), self.audio_stream_bos_id, dtype=torch.long),
+                            torch.full((ele.shape[0], 1), self.audio_stream_bos_id, dtype=torch.long, device=ele.device),
                             ele,
-                            torch.full((ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long),
+                            torch.full((ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long, device=ele.device),
                         ],
                         dim=1,
                     )
@@ -444,8 +444,9 @@ class HiggsAudioDataCollator:
             audio_in_ids = torch.cat(new_audio_in_ids_l, dim=1).long()
 
             # Compute start indices for each audio-in sequence.
+            device = new_audio_in_ids_l[0].device if new_audio_in_ids_l else torch.device("cpu")
             audio_in_ids_start = torch.cumsum(
-                torch.tensor([0] + [audio_codes.shape[1] for audio_codes in new_audio_in_ids_l[:-1]]),
+                torch.tensor([0] + [audio_codes.shape[1] for audio_codes in new_audio_in_ids_l[:-1]], device=device),
                 dim=0,
             )
         else:
@@ -471,19 +472,24 @@ class HiggsAudioDataCollator:
                     # Add BOS/EOS to audio-out codes, and construct label sequence.
                     audio_codes = torch.cat(
                         [
-                            torch.full((ele.shape[0], 1), self.audio_stream_bos_id, dtype=torch.long),
+                            torch.full((ele.shape[0], 1), self.audio_stream_bos_id, dtype=torch.long, device=ele.device),
                             ele,
-                            torch.full((ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long),
+                            torch.full((ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long, device=ele.device),
                         ],
                         dim=1,
                     )
                     if return_labels:
                         # Labels for audio codes: BOS is masked, EOS is a real token.
+                        # Use label codes if available, otherwise use audio codes
+                        if audio_out_label_ids_l and idx < len(audio_out_label_ids_l):
+                            label_ele = audio_out_label_ids_l[idx]
+                        else:
+                            label_ele = ele
                         label_audio_ids = torch.cat(
                             [
-                                torch.full((ele.shape[0], 1), -100, dtype=torch.long),
-                                ele,
-                                torch.full((ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long),
+                                torch.full((label_ele.shape[0], 1), -100, dtype=torch.long, device=label_ele.device),
+                                label_ele,
+                                torch.full((label_ele.shape[0], 1), self.audio_stream_eos_id, dtype=torch.long, device=label_ele.device),
                             ],
                             dim=1,
                         )
@@ -515,12 +521,13 @@ class HiggsAudioDataCollator:
                 label_audio_ids = torch.cat(label_audio_ids_l, dim=1).long()
 
             # Start indices for each audio-out sequence.
+            device = new_audio_out_ids_l[0].device if new_audio_out_ids_l else torch.device("cpu")
             audio_out_ids_start = torch.cumsum(
-                torch.tensor([0] + [audio_codes.shape[1] for audio_codes in new_audio_out_ids_l[:-1]]),
+                torch.tensor([0] + [audio_codes.shape[1] for audio_codes in new_audio_out_ids_l[:-1]], device=device),
                 dim=0,
             )
             # For each audio-out group, store which sample index it came from.
-            audio_out_ids_start_group_loc = torch.tensor(audio_out_ids_group_loc_l, dtype=torch.long)
+            audio_out_ids_start_group_loc = torch.tensor(audio_out_ids_group_loc_l, dtype=torch.long, device=device)
         else:
             audio_out_ids = torch.zeros((0, 0), dtype=torch.long)
             audio_out_ids_start = torch.zeros(0, dtype=torch.long)
