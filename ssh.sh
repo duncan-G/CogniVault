@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # SSH connection variables
-HOST="ubuntu@129.146.76.242"
+HOST="ubuntu@<IP_ADDRESS>"
 PRIV_KEY="./my-access-ssh-key.pem"
 
 # SSH command
