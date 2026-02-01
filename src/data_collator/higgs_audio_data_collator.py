@@ -210,6 +210,8 @@ class HiggsAudioDataCollator:
 
                     # Resample audio to match Whisper's feature extractor sampling rate.
                     target_sr = self.whisper_processor.feature_extractor.sampling_rate
+                    # Convert tensor to Python number if needed
+                    sr = sr.item() if isinstance(sr, torch.Tensor) else sr
                     if sr != target_sr:
                         resampled_wv = librosa.resample(
                             wv.cpu().numpy(),
