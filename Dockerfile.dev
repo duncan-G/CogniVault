@@ -8,6 +8,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install torchaudio as it's not included in the base image
+# We point directly to the CUDA 12.8 wheelhouse to match the NVIDIA 25.02 environment
+RUN pip install torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
+
 
 # Copy the project code
 COPY . .
