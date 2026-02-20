@@ -14,7 +14,7 @@ from transformers.cache_utils import StaticCache
 from src.data_models.model_output_processor import ModelOutputProcessor
 from src.data_models.chat import Chat
 from src.data_collator.higgs_audio_data_collator import HiggsAudioDataCollator
-from src.data_models.chat_processor import ChatProcessor
+from src.input_processor import ChatProcessor
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 from src.audio_model.model import HiggsAudioModel
 

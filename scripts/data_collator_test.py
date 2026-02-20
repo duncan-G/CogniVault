@@ -25,7 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.data_models.chat import Chat
 from src.data_models.message import Message
 from src.data_models.message_content import TextContent, AudioContent
-from src.data_models.chat_processor import ChatProcessor
+from src.input_processor import ChatProcessor
 from src.data_collator.higgs_audio_data_collator import HiggsAudioDataCollator
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 

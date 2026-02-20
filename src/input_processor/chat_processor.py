@@ -14,9 +14,9 @@ import dacite
 import torch
 from transformers import AutoTokenizer
 
-from .chat import Chat
-from .message_content import TextContent, AudioContent
-from .constants import (
+from src.data_models.chat import Chat
+from src.data_models.message_content import TextContent, AudioContent
+from src.data_models.constants import (
     AUDIO_IN_TOKEN,
     AUDIO_OUT_TOKEN,
     AUDIO_BOS,
@@ -29,11 +29,11 @@ from .constants import (
     EOT_ID,
     EOM_ID,
 )
-from .model_input import HiggsAudioModelInput
+from src.data_models.model_input import HiggsAudioModelInput
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 
 
-class ChatProcessor:
+class InputProcessor:
     """
     Converts Chat instances into model-ready tensors for a multimodal (text + audio) model.
     """

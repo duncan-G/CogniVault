@@ -290,6 +290,7 @@ def build_chat_with_speaker_audio(
 def main():
     """Main generation function."""
     print("Initializing AudioEngine...")
+    # Use fewer/smaller KV cache lengths to reduce memory (max must be >= prompt_len + max_new_tokens)
     engine = AudioEngine(
         model_name_or_path=MODEL_PATH,
         tokenizer_name_or_path=MODEL_PATH,
