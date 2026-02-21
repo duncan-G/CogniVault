@@ -25,3 +25,7 @@ argbind
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-instrumentation-logging
+grpcio
+grpcio-tools
+grpcio-reflection
+protobuf

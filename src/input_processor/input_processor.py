@@ -1,9 +1,9 @@
-from src.data_models.message import Message
-
+from __future__ import annotations
 
 import base64
+import uuid
 from io import BytesIO
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 import librosa
 import numpy as np
@@ -11,27 +11,61 @@ import torch
 from transformers import AutoTokenizer
 
 from src.data_models.chat import Chat
+from src.data_models.generation_input import GenerationChatInput
+from src.data_models.message import Message
 from src.data_models.message_content import TextContent, AudioContent
+from src.data_models.speaker import Speaker
 from src.data_models.constants import (
     AUDIO_IN_TOKEN,
     AUDIO_OUT_TOKEN,
     AUDIO_BOS,
     AUDIO_EOS,
     AUDIO_OUT_BOS,
+    AUDIO_PLACEHOLDER_TOKEN,
     BEGIN_OF_TEXT,
     START_HEADER_ID,
     END_HEADER_ID,
     RECIPIENT,
     EOT_ID,
     EOM_ID,
+    SCENE_DESC_START,
+    SCENE_DESC_END,
+    DEFAULT_SYSTEM_MESSAGE,
 )
 from src.data_models.model_input import HiggsAudioModelInput
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 
+_SOUND_EFFECT_MAP = [
+    ("[laugh]", "<SE>[Laughter]</SE>"),
+    ("[humming start]", "<SE_s>[Humming]</SE_s>"),
+    ("[humming end]", "<SE_e>[Humming]</SE_e>"),
+    ("[music start]", "<SE_s>[Music]</SE_s>"),
+    ("[music end]", "<SE_e>[Music]</SE_e>"),
+    ("[music]", "<SE>[Music]</SE>"),
+    ("[sing start]", "<SE_s>[Singing]</SE_s>"),
+    ("[sing end]", "<SE_e>[Singing]</SE_e>"),
+    ("[applause]", "<SE>[Applause]</SE>"),
+    ("[cheering]", "<SE>[Cheering]</SE>"),
+    ("[cough]", "<SE>[Cough]</SE>"),
+]
+
+_TERMINAL_PUNCTUATION = frozenset({
+    ".", "!", "?", ",", ";", '"', "'", "</SE_e>", "</SE>",
+})
+
 
 class InputProcessor:
-    """
-    Converts Chat instances into model-ready tensors for a multimodal (text + audio) model.
+    """Converts generation inputs into model-ready tensors for a multimodal
+    (text + audio) model.
+
+    Two-stage pipeline:
+
+    1. **Chat preparation** – :meth:`prepare_chats` takes high-level
+       :class:`GenerationChatInput` objects (prompt, scene, speakers) and
+       produces fully-formed :class:`Chat` objects with system messages,
+       speaker audio references, and normalized user prompts.
+    2. **Tokenization** – :meth:`process_inputs` converts :class:`Chat`
+       objects into :class:`HiggsAudioModelInput` tensors ready for the model.
     """
 
     def __init__(
@@ -43,6 +77,120 @@ class InputProcessor:
         self.text_tokenizer = text_tokenizer
         self.audio_tokenizer = audio_tokenizer
         self.device = device if device is not None else torch.device('cpu')
+
+    # =====================================================================
+    # Stage 1: Chat preparation  (GenerationChatInput → Chat)
+    # =====================================================================
+
+    def prepare_chats(self, inputs: List[GenerationChatInput]) -> List[Chat]:
+        """Convert client generation inputs into Chat objects.
+
+        Each :class:`GenerationChatInput` is expanded into a :class:`Chat`
+        containing a system message (scene + speaker info), optional speaker
+        audio reference pairs, and the normalized user prompt.
+        """
+        return [self._prepare_chat(inp) for inp in inputs]
+
+    def _prepare_chat(self, gen_input: GenerationChatInput) -> Chat:
+        normalized_prompt = self.normalize_prompt(gen_input.prompt)
+        system_msg = self.build_system_message(
+            gen_input.scene_description, gen_input.speakers,
+        )
+
+        messages: List[Message] = [system_msg]
+        messages.extend(self._build_speaker_audio_pairs(gen_input.speakers))
+        messages.append(
+            Message(role="user", content=TextContent(text=normalized_prompt)),
+        )
+
+        return Chat(id=gen_input.id, messages=messages)
+
+    @staticmethod
+    def normalize_prompt(text: str) -> str:
+        """Normalize prompt text for audio generation.
+
+        Handles parentheses removal, temperature symbol expansion,
+        sound-effect tag conversion, whitespace normalization, and
+        ensures text ends with terminal punctuation.
+        """
+        text = text.replace("(", " ").replace(")", " ")
+        text = text.replace("°F", " degrees Fahrenheit")
+        text = text.replace("°C", " degrees Celsius")
+
+        for tag, replacement in _SOUND_EFFECT_MAP:
+            text = text.replace(tag, replacement)
+
+        lines = text.split("\n")
+        text = "\n".join(" ".join(line.split()) for line in lines if line.strip())
+        text = text.strip()
+
+        if not any(text.endswith(p) for p in _TERMINAL_PUNCTUATION):
+            text += "."
+
+        return text
+
+    @staticmethod
+    def build_system_message(
+        scene_description: str,
+        speakers: List[Speaker],
+    ) -> Message:
+        """Build a system :class:`Message` with scene description and speaker
+        information.
+
+        Speakers with an ``audio_url`` get an inline audio placeholder that the
+        tokenizer later expands into audio input tokens.
+        """
+        speaker_lines = []
+        for speaker in speakers:
+            if speaker.audio_url:
+                speaker_lines.append(f"{speaker.name}: {AUDIO_PLACEHOLDER_TOKEN}")
+            else:
+                speaker_lines.append(f"{speaker.name}: {speaker.description}")
+
+        system_text = "\n".join([
+            DEFAULT_SYSTEM_MESSAGE,
+            "",
+            SCENE_DESC_START,
+            scene_description,
+            "",
+            "\n".join(speaker_lines),
+            SCENE_DESC_END,
+        ])
+
+        content_parts: List[Union[TextContent, AudioContent]] = []
+        remaining = system_text
+        while AUDIO_PLACEHOLDER_TOKEN in remaining:
+            idx = remaining.find(AUDIO_PLACEHOLDER_TOKEN)
+            if idx > 0:
+                content_parts.append(TextContent(text=remaining[:idx]))
+            content_parts.append(AudioContent(audio_url=""))
+            remaining = remaining[idx + len(AUDIO_PLACEHOLDER_TOKEN):]
+        if remaining:
+            content_parts.append(TextContent(text=remaining))
+
+        if len(content_parts) == 1:
+            return Message(role="system", content=content_parts[0])
+        return Message(role="system", content=content_parts)
+
+    @staticmethod
+    def _build_speaker_audio_pairs(speakers: List[Speaker]) -> List[Message]:
+        """Create user/assistant message pairs for speakers with reference audio."""
+        pairs: List[Message] = []
+        for speaker in speakers:
+            if speaker.audio_url:
+                pairs.append(Message(
+                    role="user",
+                    content=TextContent(text=f"{speaker.name}: {speaker.description}"),
+                ))
+                pairs.append(Message(
+                    role="assistant",
+                    content=AudioContent(audio_url=speaker.audio_url),
+                ))
+        return pairs
+
+    # =====================================================================
+    # Stage 2: Tokenization  (Chat → HiggsAudioModelInput)
+    # =====================================================================
 
     def process_inputs(self, chats: List[Chat]) -> List[HiggsAudioModelInput]:
         """Batch process a list of chats."""

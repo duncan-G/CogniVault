@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package inference.engine;
+
+// Service definition for inference engine communication.
+// This protocol is designed for efficient binary communication between
+// the router and the Python inference engine (e.g. AsyncLLM).
+service InferenceEngine {
+  // Submit a generation request (supports streaming)
+  rpc Generate(GenerateRequest) returns (stream GenerateResponse);
+}
+
+// =====================
+// Common Types
+// =====================
+
+// Sampling parameters for audio generation
+message SamplingParams {
+  optional float temperature = 1;
+  float top_p = 2;
+  uint32 top_k = 3;
+  optional uint32 max_tokens = 4;
+  optional int32 seed = 5;
+
+  // Audio-specific generation parameters
+  optional int32 ras_win_len = 6;       // Repetition-aware sampling window length (default 7, <=0 to disable)
+  uint32 ras_win_max_num_repeat = 7;    // Max repeats within RAS window (default 2)
+  bool force_audio_gen = 8;             // Force audio token generation over text tokens
+}
+
+// =====================
+// Chat / Message types (aligned with data_models Chat)
+// =====================
+
+message Speaker {
+  string name = 1;
+  string description = 2;
+  optional string audio_url = 3;
+}
+
+message TextContent {
+  string text = 1;
+  string type = 2;  // default "text"
+}
+
+message AudioContent {
+  string audio_url = 1;
+  optional string raw_audio = 2;  // Base64-encoded audio bytes
+  string type = 3;  // default "audio"
+}
+
+message MessageContent {
+  oneof content {
+    TextContent text = 1;
+    AudioContent audio = 2;
+  }
+}
+
+message Message {
+  string role = 1;
+  MessageContent content = 2;
+  optional string recipient = 3;
+  optional Speaker speaker = 4;
+}
+
+message Chat {
+  string id = 1;  // UUID string
+  repeated Message messages = 2;
+  map<string, string> metadata = 3;
+}
+
+// =====================
+// Generate Request
+// =====================
+
+message GenerateRequest {
+  string request_id = 1;
+
+  // Prompt input: array of Chat objects
+  repeated Chat chats = 2;
+
+  // Generation parameters
+  SamplingParams sampling_params = 4;
+
+  // Streaming
+  bool stream = 5;
+}
+
+// =====================
+// Generate Response
+// =====================
+
+message GenerateResponse {
+  oneof response {
+    GenerateStreamChunk chunk = 1;     // For streaming
+    GenerateComplete complete = 2;     // For final/non-streaming
+  }
+}
+
+message GenerateStreamChunk {
+  repeated uint32 token_ids = 1;       // Incremental tokens
+  uint32 prompt_tokens = 2;
+  uint32 completion_tokens = 3;
+  bytes audio_data = 4;                // Raw float32 PCM audio chunk (if any)
+  uint32 sampling_rate = 5;            // Sampling rate of audio_data
+}
+
+message GenerateComplete {
+  repeated uint32 output_ids = 1;      // All output tokens
+  string finish_reason = 2;            // "stop", "length", "abort"
+  uint32 prompt_tokens = 3;
+  uint32 completion_tokens = 4;
+  bytes audio_data = 5;               // Raw float32 PCM audio waveform
+  uint32 sampling_rate = 6;           // Sampling rate of audio_data (e.g. 24000)
+}
+
