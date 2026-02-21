@@ -202,7 +202,7 @@ def build_system_message(scene_prompt: str, speakers: List[Speaker]) -> Message:
     system_text = "\n".join(system_parts)
     
     # Build content list with audio placeholders interleaved
-    # The chat processor will handle lists of content items
+    # The input processor will handle lists of content items
     content_list = []
     remaining_text = system_text
     

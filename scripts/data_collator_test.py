@@ -4,7 +4,7 @@ Smoke test for the data collator pipeline.
 
 This test:
 1. Creates sample Chat objects (with text and optionally audio)
-2. Converts them to HiggsAudioModelInput using ChatProcessor
+2. Converts them to HiggsAudioModelInput using InputProcessor
 3. Runs them through HiggsAudioDataCollator to create a batched ModelBatchInput
 """
 
@@ -25,7 +25,7 @@ if str(REPO_ROOT) not in sys.path:
 from src.data_models.chat import Chat
 from src.data_models.message import Message
 from src.data_models.message_content import TextContent, AudioContent
-from src.input_processor import ChatProcessor
+from src.input_processor import InputProcessor
 from src.data_collator.higgs_audio_data_collator import HiggsAudioDataCollator
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 
@@ -241,9 +241,9 @@ def main():
     print(f"   Audio OUT token ID: {token_ids['audio_out_token_id']}")
     print(f"   Pad token ID: {token_ids['pad_token_id']}")
     
-    # Step 4: Create ChatProcessor
-    print("\n4. Creating ChatProcessor...")
-    input_processor = ChatProcessor(
+    # Step 4: Create InputProcessor
+    print("\n4. Creating InputProcessor...")
+    input_processor = InputProcessor(
         text_tokenizer=text_tokenizer,
         audio_tokenizer=audio_tokenizer,
         device=torch.device(device)
@@ -252,7 +252,7 @@ def main():
     # Step 5: Convert chats to model inputs
     print("\n5. Converting chats to HiggsAudioModelInput...")
     try:
-        model_inputs = input_processor.process_chats(chats)
+        model_inputs = input_processor.process_inputs(chats)
         print(f"   ✓ Converted {len(model_inputs)} chat(s) to model input(s)")
         
         for i, model_input in enumerate(model_inputs):

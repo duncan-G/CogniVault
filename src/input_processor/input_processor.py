@@ -2,15 +2,11 @@ from src.data_models.message import Message
 
 
 import base64
-import json
 from io import BytesIO
-from typing import Union, List, Dict, Tuple, Optional, Any
-from dataclasses import fields
+from typing import List, Tuple, Optional
 
 import librosa
 import numpy as np
-import pandas as pd
-import dacite
 import torch
 from transformers import AutoTokenizer
 
@@ -48,20 +44,13 @@ class InputProcessor:
         self.audio_tokenizer = audio_tokenizer
         self.device = device if device is not None else torch.device('cpu')
 
-    def process_chats(self, chats: List[Union[Chat, Dict[str, Any]]]) -> List[HiggsAudioModelInput]:
+    def process_inputs(self, chats: List[Chat]) -> List[HiggsAudioModelInput]:
         """Batch process a list of chats."""
-        return [self.process_chat(chat) for chat in chats]
+        return [self.process_input(chat) for chat in chats]
 
-    def process_chat(self, chat: Union[Chat, Dict[str, Any]]) -> HiggsAudioModelInput:
+    def process_input(self, chat: Chat) -> HiggsAudioModelInput:
         """Process a single chat into a model-ready input."""
-        # 1. Validation and Conversion
-        if not isinstance(chat, Chat):
-            chat = self._dict_to_chat(chat)
-        
-            if chat is None:
-                raise ValueError("Failed to convert input to Chat object")
-
-        # 2. Tokenize Text & Collect Audio Content
+        # 1. Tokenize Text & Collect Audio Content
         input_tokens = []
         label_tokens = []
         audio_contents = []
@@ -206,40 +195,6 @@ class InputProcessor:
         audio_sample_rate = torch.tensor(sample_rates, dtype=torch.float32, device=self.device)
 
         return audio_ids_concat, audio_ids_start, audio_waveforms_concat, audio_waveforms_start, audio_sample_rate
-
-    def _dict_to_chat(self, sample: Dict[str, Any]) -> Optional[Chat]:
-        """Safely convert a raw dictionary to a Chat object, handling NaNs."""
-        def clean_value(obj):
-            if isinstance(obj, (pd.Series, np.ndarray)):
-                return obj.tolist()
-            if pd.api.types.is_scalar(obj) and pd.isna(obj):
-                return None
-            if isinstance(obj, dict):
-                return {k: clean_value(v) for k, v in obj.items()}
-            if isinstance(obj, (list, tuple)):
-                return [clean_value(item) for item in obj]
-            return obj
-
-        clean_sample = clean_value(sample)
-        if not isinstance(clean_sample, dict):
-             return None
-
-        # Defaults
-        if "speaker" not in clean_sample: clean_sample["speaker"] = None
-        if "content" not in clean_sample: clean_sample["content"] = ""
-        
-        valid_keys = {f.name for f in fields(Chat)}
-        filtered_sample = {k: v for k, v in clean_sample.items() if k in valid_keys}
-
-        try:
-            return dacite.from_dict(
-                data_class=Chat, 
-                data=filtered_sample, 
-                config=dacite.Config(strict=False, check_types=True)
-            )
-        except Exception as e:
-            print(f"Failed to convert dict to Chat: {e}")
-            return None
 
     # ---------------------------------------------------------------------
     # Message Processing Helper Methods

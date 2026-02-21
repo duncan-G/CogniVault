@@ -1,3 +1,3 @@
-from .chat_processor import ChatProcessor
+from .input_processor import InputProcessor
 
-__all__ = ["ChatProcessor"]
+__all__ = ["InputProcessor"]
