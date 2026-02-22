@@ -14,6 +14,7 @@ engine.
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import uuid
 from collections.abc import AsyncGenerator
@@ -21,6 +22,7 @@ from typing import Any
 
 import grpc
 import numpy as np
+import soundfile as sf
 
 from inference_grpc import inference_engine_pb2 as pb2
 from inference_grpc import inference_engine_pb2_grpc
@@ -146,13 +148,22 @@ def _sampling_params_from_proto(params: pb2.SamplingParams) -> dict[str, Any]:
 # Internal → proto response helpers
 # ======================================================================
 
+
+def _audio_to_wav_bytes(audio: np.ndarray, sampling_rate: int) -> bytes:
+    """Encode audio as 16-bit PCM WAV bytes for downstream encoding (MP3/AAC)."""
+    buf = io.BytesIO()
+    sf.write(buf, audio.astype(np.float32), sampling_rate, format="WAV", subtype="PCM_16")
+    buf.seek(0)
+    return buf.read()
+
+
 def _build_response(response: Response) -> pb2.GenerateResponse:
     """Build a ``GenerateComplete`` from an engine :class:`Response`."""
     usage = response.usage or {}
 
     audio_bytes = b""
-    if response.audio is not None:
-        audio_bytes = response.audio.astype(np.float32).tobytes()
+    if response.audio is not None and response.sampling_rate:
+        audio_bytes = _audio_to_wav_bytes(response.audio, response.sampling_rate)
 
     output_ids: list[int] = []
     if response.generated_text_tokens is not None:

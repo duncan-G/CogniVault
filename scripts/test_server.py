@@ -10,11 +10,10 @@ import argparse
 import os
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import grpc
-import numpy as np
-import soundfile as sf
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -62,11 +61,14 @@ SCENE_DESCRIPTION = "Audio is recorded from a quiet room."
 # Main
 # ============================================================================
 
+OUTPUT_DIR = Path(__file__).resolve().parent / "audio_outputs"
+
+
 def main():
     parser = argparse.ArgumentParser(description="gRPC audio generation client")
     parser.add_argument("--host", default=os.getenv("HOST", "localhost"))
     parser.add_argument("--port", type=int, default=int(os.getenv("PORT", "50051")))
-    parser.add_argument("--output", default="grpc_output.wav")
+    parser.add_argument("--output", default=None, help="Output path (default: audio_outputs/<timestamp>.wav)")
     args = parser.parse_args()
 
     address = f"{args.host}:{args.port}"
@@ -102,8 +104,8 @@ def main():
     )
 
     print("Sending Generate request...")
-    audio_chunks = []
-    sampling_rate = 24000
+    wav_data = b""
+    sampling_rate = 0
 
     for response in stub.Generate(request):
         resp_type = response.WhichOneof("response")
@@ -111,11 +113,6 @@ def main():
         if resp_type == "chunk":
             chunk = response.chunk
             print(f"  Stream chunk: {chunk.completion_tokens} tokens")
-            if chunk.audio_data:
-                pcm = np.frombuffer(chunk.audio_data, dtype=np.float32)
-                audio_chunks.append(pcm)
-                if chunk.sampling_rate:
-                    sampling_rate = chunk.sampling_rate
 
         elif resp_type == "complete":
             complete = response.complete
@@ -123,22 +120,27 @@ def main():
                   f"prompt_tokens={complete.prompt_tokens}, "
                   f"completion_tokens={complete.completion_tokens}")
             if complete.audio_data:
-                pcm = np.frombuffer(complete.audio_data, dtype=np.float32)
-                audio_chunks.append(pcm)
-                if complete.sampling_rate:
-                    sampling_rate = complete.sampling_rate
+                wav_data = complete.audio_data
+                sampling_rate = complete.sampling_rate
 
     channel.close()
 
-    if not audio_chunks:
+    if not wav_data:
         print("Error: No audio received from server!")
         return
 
-    final_audio = np.concatenate(audio_chunks)
-    sf.write(args.output, final_audio, sampling_rate)
+    if args.output is not None:
+        output_path = Path(args.output)
+    else:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        output_path = OUTPUT_DIR / f"{timestamp}.wav"
 
-    duration = len(final_audio) / sampling_rate
-    print(f"Audio saved to {args.output}")
+    output_path.write_bytes(wav_data)
+
+    # 16-bit PCM WAV: data size = file size - 44 byte header
+    duration = (len(wav_data) - 44) / (sampling_rate * 2) if sampling_rate else 0
+    print(f"Audio saved to {output_path}")
     print(f"  Duration: {duration:.2f}s, Sampling rate: {sampling_rate} Hz")
 
 
