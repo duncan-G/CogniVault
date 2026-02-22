@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-from inference_grpc import inference_engine_pb2 as inference__grpc_dot_inference__engine__pb2
+import inference_engine_pb2 as inference__engine__pb2
 
 GRPC_GENERATED_VERSION = '1.78.1'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in inference_grpc/inference_engine_pb2_grpc.py depends on'
+        + ' but the generated code in inference_engine_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -36,8 +36,8 @@ class InferenceEngineStub(object):
         """
         self.Generate = channel.unary_stream(
                 '/inference.engine.InferenceEngine/Generate',
-                request_serializer=inference__grpc_dot_inference__engine__pb2.GenerateRequest.SerializeToString,
-                response_deserializer=inference__grpc_dot_inference__engine__pb2.GenerateResponse.FromString,
+                request_serializer=inference__engine__pb2.GenerateRequest.SerializeToString,
+                response_deserializer=inference__engine__pb2.GenerateResponse.FromString,
                 _registered_method=True)
 
 
@@ -55,8 +55,8 @@ def add_InferenceEngineServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Generate': grpc.unary_stream_rpc_method_handler(
                     servicer.Generate,
-                    request_deserializer=inference__grpc_dot_inference__engine__pb2.GenerateRequest.FromString,
-                    response_serializer=inference__grpc_dot_inference__engine__pb2.GenerateResponse.SerializeToString,
+                    request_deserializer=inference__engine__pb2.GenerateRequest.FromString,
+                    response_serializer=inference__engine__pb2.GenerateResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -84,8 +84,8 @@ class InferenceEngine(object):
             request,
             target,
             '/inference.engine.InferenceEngine/Generate',
-            inference__grpc_dot_inference__engine__pb2.GenerateRequest.SerializeToString,
-            inference__grpc_dot_inference__engine__pb2.GenerateResponse.FromString,
+            inference__engine__pb2.GenerateRequest.SerializeToString,
+            inference__engine__pb2.GenerateResponse.FromString,
             options,
             channel_credentials,
             insecure,

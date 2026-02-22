@@ -71,6 +71,7 @@ message GenerateStreamChunk {
   uint32 completion_tokens = 3;
   bytes audio_data = 4;
   uint32 sampling_rate = 5;
+  string audio_format = 6;
 }
 
 message GenerateComplete {
@@ -80,4 +81,5 @@ message GenerateComplete {
   uint32 completion_tokens = 4;
   bytes audio_data = 5;
   uint32 sampling_rate = 6;
+  string audio_format = 7;
 }

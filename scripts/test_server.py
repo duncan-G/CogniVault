@@ -104,8 +104,9 @@ def main():
     )
 
     print("Sending Generate request...")
-    wav_data = b""
+    audio_data = b""
     sampling_rate = 0
+    audio_format = "flac"
 
     for response in stub.Generate(request):
         resp_type = response.WhichOneof("response")
@@ -120,28 +121,30 @@ def main():
                   f"prompt_tokens={complete.prompt_tokens}, "
                   f"completion_tokens={complete.completion_tokens}")
             if complete.audio_data:
-                wav_data = complete.audio_data
+                audio_data = complete.audio_data
                 sampling_rate = complete.sampling_rate
+                audio_format = complete.audio_format or audio_format
 
     channel.close()
 
-    if not wav_data:
+    if not audio_data:
         print("Error: No audio received from server!")
         return
 
+    ext = audio_format.lower()
     if args.output is not None:
         output_path = Path(args.output)
     else:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        output_path = OUTPUT_DIR / f"{timestamp}.wav"
+        output_path = OUTPUT_DIR / f"{timestamp}.{ext}"
 
-    output_path.write_bytes(wav_data)
+    output_path.write_bytes(audio_data)
 
-    # 16-bit PCM WAV: data size = file size - 44 byte header
-    duration = (len(wav_data) - 44) / (sampling_rate * 2) if sampling_rate else 0
+    import soundfile as sf
+    info = sf.info(output_path)
     print(f"Audio saved to {output_path}")
-    print(f"  Duration: {duration:.2f}s, Sampling rate: {sampling_rate} Hz")
+    print(f"  Format: {audio_format.upper()}, Duration: {info.duration:.2f}s, Sampling rate: {sampling_rate} Hz")
 
 
 if __name__ == "__main__":

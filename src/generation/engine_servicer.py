@@ -149,10 +149,13 @@ def _sampling_params_from_proto(params: pb2.SamplingParams) -> dict[str, Any]:
 # ======================================================================
 
 
-def _audio_to_wav_bytes(audio: np.ndarray, sampling_rate: int) -> bytes:
-    """Encode audio as 16-bit PCM WAV bytes for downstream encoding (MP3/AAC)."""
+AUDIO_FORMAT = "flac"
+
+
+def _audio_to_bytes(audio: np.ndarray, sampling_rate: int) -> bytes:
+    """Encode audio as FLAC bytes."""
     buf = io.BytesIO()
-    sf.write(buf, audio.astype(np.float32), sampling_rate, format="WAV", subtype="PCM_16")
+    sf.write(buf, audio.astype(np.float32), sampling_rate, format="FLAC")
     buf.seek(0)
     return buf.read()
 
@@ -163,7 +166,7 @@ def _build_response(response: Response) -> pb2.GenerateResponse:
 
     audio_bytes = b""
     if response.audio is not None and response.sampling_rate:
-        audio_bytes = _audio_to_wav_bytes(response.audio, response.sampling_rate)
+        audio_bytes = _audio_to_bytes(response.audio, response.sampling_rate)
 
     output_ids: list[int] = []
     if response.generated_text_tokens is not None:
@@ -177,5 +180,6 @@ def _build_response(response: Response) -> pb2.GenerateResponse:
             completion_tokens=usage.get("completion_tokens", 0),
             audio_data=audio_bytes,
             sampling_rate=response.sampling_rate or 0,
+            audio_format=AUDIO_FORMAT,
         ),
     )
