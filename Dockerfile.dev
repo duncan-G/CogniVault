@@ -1,19 +1,33 @@
 # Use NVIDIA PyTorch base image
 FROM nvcr.io/nvidia/pytorch:25.02-py3
 
-# Set working directory
-WORKDIR /app
+ARG USERNAME=vscode
+ARG USER_UID=1000
+ARG USER_GID=1000
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 1. Handle User Creation FIRST
+RUN apt-get update && apt-get install -y sudo \
+    && if getent passwd $USER_UID; then \
+        OLD_USER=$(getent passwd $USER_UID | cut -d: -f1); \
+        usermod -l $USERNAME $OLD_USER; \
+        usermod -d /home/$USERNAME -m $USERNAME; \
+        groupmod -n $USERNAME $(getent group $USER_GID | cut -d: -f1) || true; \
+    else \
+        groupadd --gid $USER_GID $USERNAME || true; \
+        useradd --uid $USER_UID --gid $USER_GID -m $USERNAME; \
+    fi \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
 
-# Install torchaudio as it's not included in the base image
-# We point directly to the CUDA 12.8 wheelhouse to match the NVIDIA 25.02 environment
+# 2. Prepare the Workspace with correct permissions
+RUN mkdir -p /workspaces/CogniVault && chown -R $USERNAME:$USER_GID /workspaces
+WORKDIR /workspaces/CogniVault
+
+# 3. Install dependencies as the USER
+# This ensures pip cache and site-packages are accessible
+COPY --chown=$USERNAME:$USER_GID requirements.txt .
+RUN pip install -r requirements.txt
 RUN pip install torchaudio==2.7.0 --index-url https://download.pytorch.org/whl/cu128
 
-
-# Default to an interactive shell so you can exec and run scripts manually.
-# Override CMD in `docker run` if you want a specific script.
+USER $USERNAME
 CMD ["/bin/bash"]
-

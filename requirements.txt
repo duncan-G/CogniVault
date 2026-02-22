@@ -1,5 +1,6 @@
 transformers>=4.45.1,<4.47.0
 librosa
+soundfile
 dacite
 boto3==1.35.36
 s3fs
@@ -25,3 +26,7 @@ argbind
 opentelemetry-sdk
 opentelemetry-exporter-otlp-proto-grpc
 opentelemetry-instrumentation-logging
+grpcio
+grpcio-tools
+grpcio-reflection
+protobuf

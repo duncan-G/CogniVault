@@ -7,9 +7,6 @@ from .storage_sample import HiggsAudioModelInputStorageSample
 # Dataset interfaces
 from .dataset_interface import DatasetInterface, IterableDatasetInterface, DatasetInfo
 
-# Chat processing class
-from .chat_processor import ChatProcessor
-
 # Constants
 from .constants import (
     AUDIO_IN_TOKEN,
@@ -19,7 +16,7 @@ from .constants import (
 )
 
 # Other data models
-from .chat import Chat
+from .generation_input import GenerationInput
 from .message import Message
 from .message_content import TextContent, AudioContent
 from .model_batch_input import HiggsAudioBatchModelInput
@@ -33,15 +30,13 @@ __all__ = [
     "DatasetInterface",
     "IterableDatasetInterface",
     "DatasetInfo",
-    # Chat processing
-    "ChatProcessor",
     # Constants
     "AUDIO_IN_TOKEN",
     "AUDIO_OUT_TOKEN",
     "EOS_TOKEN",
     "WHISPER_EMBED_NUM_HIDDEN_STATE_PER_SEC",
     # Other data models
-    "Chat",
+    "GenerationInput",
     "Message",
     "TextContent",
     "AudioContent",

@@ -12,9 +12,9 @@ from transformers import AutoTokenizer, WhisperProcessor
 from transformers.cache_utils import StaticCache
 
 from src.data_models.model_output_processor import ModelOutputProcessor
-from src.data_models.chat import Chat
+from src.data_models.generation_input import GenerationInput
 from src.data_collator.higgs_audio_data_collator import HiggsAudioDataCollator
-from src.data_models.chat_processor import ChatProcessor
+from src.input_processor import InputProcessor
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
 from src.audio_model.model import HiggsAudioModel
 
@@ -53,7 +53,7 @@ class AudioEngine:
         self.model = self._load_model()
         self.audio_tokenizer = self._load_audio_tokenizer()
         self.audio_codebook_size = self.model.config.audio_codebook_size
-        self.input_processor = self._create_chat_processor()
+        self.input_processor = self._create_input_processor()
         self.data_collator = self._create_data_collator()
         self.output_processor = self._create_output_processor()
 
@@ -78,7 +78,7 @@ class AudioEngine:
     @torch.inference_mode()
     def generate(
         self,
-        chat: Chat, 
+        chat: GenerationInput, 
         max_new_tokens: int,
         temperature: float = 0.7,
         top_k: Optional[int] = None,
@@ -110,7 +110,7 @@ class AudioEngine:
         with torch.no_grad():
             try:
                 input_start = perf_counter()
-                input = self.input_processor.process_chat(chat)
+                input = self.input_processor.process_input(chat)
                 batch = self.data_collator([input])
                 input_duration_ms = (perf_counter() - input_start) * 1000
                 prompt_token_count = int(batch.input_ids.shape[-1])
@@ -288,8 +288,8 @@ class AudioEngine:
         return model
 
 
-    def _create_chat_processor(self):
-        return ChatProcessor(
+    def _create_input_processor(self):
+        return InputProcessor(
             text_tokenizer=self.tokenizer,
             audio_tokenizer=self.audio_tokenizer,
             device=self.device
