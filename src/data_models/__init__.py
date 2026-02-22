@@ -16,8 +16,7 @@ from .constants import (
 )
 
 # Other data models
-from .chat import Chat
-from .generation_input import GenerationChatInput
+from .generation_input import GenerationInput
 from .message import Message
 from .message_content import TextContent, AudioContent
 from .model_batch_input import HiggsAudioBatchModelInput
@@ -37,8 +36,7 @@ __all__ = [
     "EOS_TOKEN",
     "WHISPER_EMBED_NUM_HIDDEN_STATE_PER_SEC",
     # Other data models
-    "Chat",
-    "GenerationChatInput",
+    "GenerationInput",
     "Message",
     "TextContent",
     "AudioContent",

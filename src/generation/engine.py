@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, WhisperProcessor
 from transformers.cache_utils import StaticCache
 
 from src.data_models.model_output_processor import ModelOutputProcessor
-from src.data_models.chat import Chat
+from src.data_models.generation_input import GenerationInput
 from src.data_collator.higgs_audio_data_collator import HiggsAudioDataCollator
 from src.input_processor import InputProcessor
 from src.audio_tokenizer.higgs_audio_tokenizer import HiggsAudioTokenizer
@@ -78,7 +78,7 @@ class AudioEngine:
     @torch.inference_mode()
     def generate(
         self,
-        chat: Chat, 
+        chat: GenerationInput, 
         max_new_tokens: int,
         temperature: float = 0.7,
         top_k: Optional[int] = None,

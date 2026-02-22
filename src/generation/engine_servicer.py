@@ -4,6 +4,11 @@ Async gRPC servicer for the InferenceEngine service.
 Delegates generation to a synchronous :class:`AudioEngine`, running the
 blocking call in a thread pool so the gRPC async event loop stays
 responsive.
+
+The servicer receives high-level :class:`GenerationInput` messages from
+clients and uses :class:`InputProcessor` to normalize prompts, build
+system messages, and assemble Chat objects before passing them to the
+engine.
 """
 
 from __future__ import annotations
@@ -12,7 +17,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import AsyncGenerator
-from typing import Any, Union
+from typing import Any
 
 import grpc
 import numpy as np
@@ -20,9 +25,9 @@ import numpy as np
 from inference_grpc import inference_engine_pb2 as pb2
 from inference_grpc import inference_engine_pb2_grpc
 
-from src.data_models.chat import Chat
+from src.data_models.generation_input import GenerationInput
 from src.data_models.message import Message
-from src.data_models.message_content import AudioContent, TextContent
+from src.data_models.message_content import TextContent
 from src.data_models.response import Response
 from src.data_models.speaker import Speaker
 from src.generation.engine import AudioEngine
@@ -52,21 +57,21 @@ class InferenceEngineServicer(inference_engine_pb2_grpc.InferenceEngineServicer)
     ) -> AsyncGenerator[pb2.GenerateResponse, None]:
         """Handle generation requests.
 
-        Converts the proto ``GenerateRequest`` into internal types, runs
-        ``engine.generate`` in a thread pool (the engine is synchronous),
-        and yields one ``GenerateComplete`` per chat.
+        Converts proto ``GenerationInput`` messages into internal
+        :class:`GenerationInput` objects, then runs ``engine.generate``
+        in a thread pool and yields one ``GenerateComplete`` per input.
         """
         request_id = request.request_id
         logger.debug("Generate request %s received.", request_id)
 
         try:
             params = _sampling_params_from_proto(request.sampling_params)
-            chats = [_proto_chat_to_internal(c) for c in request.chats]
+            gen_inputs = [_proto_input_to_internal(inp) for inp in request.inputs]
 
-            for chat in chats:
+            for gen_input in gen_inputs:
                 response: Response = await asyncio.to_thread(
                     self.engine.generate,
-                    chat=chat,
+                    chat=gen_input,
                     **params,
                 )
                 yield _build_response(response)
@@ -82,49 +87,38 @@ class InferenceEngineServicer(inference_engine_pb2_grpc.InferenceEngineServicer)
 # Proto → internal conversion helpers
 # ======================================================================
 
-def _proto_chat_to_internal(proto_chat: Any) -> Chat:
-    """Convert a proto ``Chat`` message to an internal :class:`Chat`."""
-    try:
-        chat_id = uuid.UUID(proto_chat.id)
-    except (ValueError, AttributeError):
-        chat_id = uuid.uuid4()
-
-    messages: list[Message] = []
-    for proto_msg in proto_chat.messages:
-        content_field = proto_msg.content.WhichOneof("content")
-        if content_field == "text":
-            content: Union[TextContent, AudioContent] = TextContent(
-                text=proto_msg.content.text.text,
-                type=proto_msg.content.text.type or "text",
-            )
-        elif content_field == "audio":
-            content = AudioContent(
-                audio_url=proto_msg.content.audio.audio_url,
-                raw_audio=proto_msg.content.audio.raw_audio or None,
-                type=proto_msg.content.audio.type or "audio",
-            )
-        else:
-            content = TextContent(text="")
-
+def _proto_input_to_internal(proto_input: Any) -> GenerationInput:
+    """Convert a proto ``GenerationInput`` to an internal
+    :class:`GenerationInput`."""
+    messages = []
+    for m in proto_input.messages:
         speaker = None
-        if proto_msg.HasField("speaker"):
+        if m.HasField("speaker") and m.speaker.description:
             speaker = Speaker(
-                name=proto_msg.speaker.name,
-                description=proto_msg.speaker.description,
-                audio_url=proto_msg.speaker.audio_url or None,
+                description=m.speaker.description,
+                audio_url=m.speaker.audio_url or None,
+                uuid=uuid.UUID(m.speaker.uuid) if m.speaker.uuid else uuid.uuid4(),
             )
-
         messages.append(
             Message(
-                role=proto_msg.role,
-                content=content,
-                recipient=proto_msg.recipient or None,
+                role="user",
+                content=TextContent(text=m.text),
                 speaker=speaker,
-            ),
+            )
         )
-
-    metadata = dict(proto_chat.metadata) if proto_chat.metadata else None
-    return Chat(id=chat_id, messages=messages, metadata=metadata)
+    return GenerationInput(
+        messages=messages,
+        system_prompt=(
+            proto_input.system_prompt
+            if proto_input.HasField("system_prompt")
+            else None
+        ),
+        scene_description=(
+            proto_input.scene_description
+            if proto_input.HasField("scene_description")
+            else None
+        ),
+    )
 
 
 def _sampling_params_from_proto(params: pb2.SamplingParams) -> dict[str, Any]:

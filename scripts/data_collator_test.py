@@ -10,7 +10,6 @@ This test:
 
 import os
 import sys
-import uuid
 from pathlib import Path
 import torch
 from transformers import AutoTokenizer, WhisperProcessor
@@ -22,7 +21,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 
-from src.data_models.chat import Chat
+from src.data_models.generation_input import GenerationInput
 from src.data_models.message import Message
 from src.data_models.message_content import TextContent, AudioContent
 from src.input_processor import InputProcessor
@@ -41,8 +40,8 @@ AUDIO_IN_TOKEN_ID = 128015
 AUDIO_OUT_TOKEN_ID = 128016
 
 
-def create_sample_chats() -> List[Chat]:
-    """Create sample Chat objects for testing with multimodal text-to-speech examples."""
+def create_sample_inputs() -> List[GenerationInput]:
+    """Create sample GenerationInput objects for testing with multimodal text-to-speech examples."""
     chats = []
     
     # Get available audio files - use absolute paths
@@ -62,94 +61,82 @@ def create_sample_chats() -> List[Chat]:
     # Chat 1: Text-to-Speech - User asks for audio, assistant generates audio
     # This demonstrates the core TTS functionality
     if "en_woman" in available_audio:
-        chat1 = Chat(
-            id=uuid.uuid4(),
-            messages=[
-                Message(
-                    role="user",
-                    content=TextContent(text="Can you say 'Hello, how are you today?' in a friendly voice?")
-                ),
-                Message(
-                    role="assistant",
-                    content=AudioContent(
-                        audio_url=available_audio["en_woman"],
-                        raw_audio=None
-                    )
+        chat1 = GenerationInput(messages=[
+            Message(
+                role="user",
+                content=TextContent(text="Can you say 'Hello, how are you today?' in a friendly voice?")
+            ),
+            Message(
+                role="assistant",
+                content=AudioContent(
+                    audio_url=available_audio["en_woman"],
+                    raw_audio=None
                 )
-            ]
-        )
+            ),
+        ])
         chats.append(chat1)
     
     # Chat 2: Speech-to-Text + Text-to-Speech - User provides audio, assistant responds with audio
     # This demonstrates bidirectional multimodal conversation
     if "belinda" in available_audio and "en_man" in available_audio:
-        chat2 = Chat(
-            id=uuid.uuid4(),
-            messages=[
-                Message(
-                    role="user",
-                    content=AudioContent(
-                        audio_url=available_audio["belinda"],
-                        raw_audio=None
-                    )
-                ),
-                Message(
-                    role="assistant",
-                    content=TextContent(text="I heard your message. Let me respond with audio.")
-                ),
-                Message(
-                    role="assistant",
-                    content=AudioContent(
-                        audio_url=available_audio["en_man"],
-                        raw_audio=None
-                    )
+        chat2 = GenerationInput(messages=[
+            Message(
+                role="user",
+                content=AudioContent(
+                    audio_url=available_audio["belinda"],
+                    raw_audio=None
                 )
-            ]
-        )
+            ),
+            Message(
+                role="assistant",
+                content=TextContent(text="I heard your message. Let me respond with audio.")
+            ),
+            Message(
+                role="assistant",
+                content=AudioContent(
+                    audio_url=available_audio["en_man"],
+                    raw_audio=None
+                )
+            ),
+        ])
         chats.append(chat2)
     
     # Chat 3: Mixed conversation - Text and audio in the same conversation
     if "bigbang_amy" in available_audio:
-        chat3 = Chat(
-            id=uuid.uuid4(),
-            messages=[
-                Message(
-                    role="user",
-                    content=TextContent(text="What is the capital of France?")
-                ),
-                Message(
-                    role="assistant",
-                    content=TextContent(text="The capital of France is Paris.")
-                ),
-                Message(
-                    role="user",
-                    content=TextContent(text="Can you say that in an audio message?")
-                ),
-                Message(
-                    role="assistant",
-                    content=AudioContent(
-                        audio_url=available_audio["bigbang_amy"],
-                        raw_audio=None
-                    )
-                )
-            ]
-        )
-        chats.append(chat3)
-    
-    # Chat 4: Simple text conversation (no audio) - baseline test
-    chat4 = Chat(
-        id=uuid.uuid4(),
-        messages=[
+        chat3 = GenerationInput(messages=[
             Message(
                 role="user",
-                content=TextContent(text="Hello, how are you?")
+                content=TextContent(text="What is the capital of France?")
             ),
             Message(
                 role="assistant",
-                content=TextContent(text="I'm doing well, thank you for asking!")
-            )
-        ]
-    )
+                content=TextContent(text="The capital of France is Paris.")
+            ),
+            Message(
+                role="user",
+                content=TextContent(text="Can you say that in an audio message?")
+            ),
+            Message(
+                role="assistant",
+                content=AudioContent(
+                    audio_url=available_audio["bigbang_amy"],
+                    raw_audio=None
+                )
+            ),
+        ])
+        chats.append(chat3)
+    
+    # Chat 4: Simple text conversation (no audio) - baseline test
+    chat4 = GenerationInput(messages=[
+        Message(
+            role="user",
+            content=TextContent(text="Hello, how are you?")
+        ),
+        Message(
+            role="assistant",
+            content=TextContent(text="I'm doing well, thank you for asking!")
+        ),
+    ])
     chats.append(chat4)
     
     return chats
@@ -216,14 +203,13 @@ def main():
     print("=" * 60)
     
     # Step 1: Create sample chats
-    print("\n1. Creating sample Chat objects...")
-    chats = create_sample_chats()
-    print(f"   Created {len(chats)} chat(s)")
-    
-    # Count audio messages
+    print("\n1. Creating sample GenerationInput objects...")
+    chats = create_sample_inputs()
+    print(f"   Created {len(chats)} input(s)")
+
     audio_count = sum(
-        1 for chat in chats 
-        for msg in chat.messages 
+        1 for inp in chats
+        for msg in inp.messages
         if isinstance(msg.content, AudioContent)
     )
     print(f"   Total audio messages: {audio_count}")

@@ -1,19 +1,20 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 import uuid
 
-from .speaker import Speaker
+from .message import Message
 
 
 @dataclass
-class GenerationChatInput:
-    """High-level input for audio generation.
+class GenerationInput:
+    """Client-facing input for audio generation.
 
-    Clients pass an array of these objects. The InputProcessor normalizes
-    the prompt, builds system messages with scene/speaker info, and produces
-    Chat objects ready for tokenization and generation.
+    Contains an array of messages (each with text content and a speaker)
+    and optional overrides.  When ``system_prompt`` is provided the
+    server uses it verbatim; otherwise it builds one from
+    ``scene_description`` and the speakers found in ``messages``.
     """
-    prompt: str
-    scene_description: str
-    speakers: List[Speaker]
+    messages: List[Message]
+    system_prompt: Optional[str] = None
+    scene_description: Optional[str] = None
     id: uuid.UUID = field(default_factory=uuid.uuid4)

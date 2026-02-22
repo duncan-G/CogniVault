@@ -10,8 +10,7 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer
 
-from src.data_models.chat import Chat
-from src.data_models.generation_input import GenerationChatInput
+from src.data_models.generation_input import GenerationInput
 from src.data_models.message import Message
 from src.data_models.message_content import TextContent, AudioContent
 from src.data_models.speaker import Speaker
@@ -53,19 +52,18 @@ _TERMINAL_PUNCTUATION = frozenset({
     ".", "!", "?", ",", ";", '"', "'", "</SE_e>", "</SE>",
 })
 
-
 class InputProcessor:
     """Converts generation inputs into model-ready tensors for a multimodal
     (text + audio) model.
 
     Two-stage pipeline:
 
-    1. **Chat preparation** – :meth:`prepare_chats` takes high-level
-       :class:`GenerationChatInput` objects (prompt, scene, speakers) and
-       produces fully-formed :class:`Chat` objects with system messages,
-       speaker audio references, and normalized user prompts.
-    2. **Tokenization** – :meth:`process_inputs` converts :class:`Chat`
-       objects into :class:`HiggsAudioModelInput` tensors ready for the model.
+    1. **Preparation** – :meth:`prepare` takes a :class:`GenerationInput`
+       and returns a ``List[Message]`` (system message, speaker audio
+       pairs, normalized user prompt).
+    2. **Tokenization** – :meth:`process_input` converts a
+       ``List[Message]`` into a :class:`HiggsAudioModelInput` tensor
+       ready for the model.
     """
 
     def __init__(
@@ -79,31 +77,106 @@ class InputProcessor:
         self.device = device if device is not None else torch.device('cpu')
 
     # =====================================================================
-    # Stage 1: Chat preparation  (GenerationChatInput → Chat)
+    # Stage 1: Preparation  (GenerationInput → List[Message])
     # =====================================================================
 
-    def prepare_chats(self, inputs: List[GenerationChatInput]) -> List[Chat]:
-        """Convert client generation inputs into Chat objects.
+    def prepare(self, gen_input: GenerationInput) -> List[Message]:
+        """Build the internal message list from a :class:`GenerationInput`."""
+        speaker_index_map, msg_speaker_labels = self._assign_speaker_labels(
+            gen_input.messages
+        )
 
-        Each :class:`GenerationChatInput` is expanded into a :class:`Chat`
-        containing a system message (scene + speaker info), optional speaker
-        audio reference pairs, and the normalized user prompt.
+        indexed_speakers = self._collect_indexed_speakers(
+            gen_input.messages, speaker_index_map
+        )
+        has_undescribed = any(m.speaker is None for m in gen_input.messages)
+
+        messages: List[Message] = [
+            self.build_system_message(
+                indexed_speakers,
+                system_prompt=gen_input.system_prompt,
+                scene_description=gen_input.scene_description,
+                has_undescribed_speakers=has_undescribed,
+            )
+        ]
+        messages.extend(self._build_speaker_audio_pairs(indexed_speakers))
+
+        for msg, label in zip(gen_input.messages, msg_speaker_labels):
+            normalized_msg = self._normalize_message(msg, label)
+            messages.append(normalized_msg)
+
+        return messages
+
+    def _normalize_message(self, msg: Message, speaker_label: str) -> Message:
+        """Normalize a message and prepend its speaker label to text content."""
+        if isinstance(msg.content, TextContent):
+            text = self.normalize_prompt(msg.content.text)
+            return Message(
+                role=msg.role,
+                speaker=msg.speaker,
+                content=TextContent(text=f"[{speaker_label}] {text}"),
+            )
+
+        if isinstance(msg.content, list):
+            normalized_parts = []
+            for i, item in enumerate(msg.content):
+                if isinstance(item, TextContent):
+                    text = self.normalize_prompt(item.text)
+                    if i == 0:
+                        text = f"[{speaker_label}] {text}"
+                    normalized_parts.append(TextContent(text=text))
+                else:
+                    normalized_parts.append(item)
+            return Message(role=msg.role, speaker=msg.speaker, content=normalized_parts)
+
+        return msg
+
+    @staticmethod
+    def _assign_speaker_labels(
+        messages: List[Message],
+    ) -> Tuple[dict, List[str]]:
+        """Assign ``SPEAKER<i>`` labels to every message.
+
+        Speakers with a :class:`Speaker` object are deduplicated by UUID.
+        Messages without a speaker each receive a unique label.
+
+        Returns ``(speaker_index_map, per_message_labels)`` where
+        *speaker_index_map* maps ``Speaker.uuid → int`` and
+        *per_message_labels* is a list of label strings parallel to
+        *messages*.
         """
-        return [self._prepare_chat(inp) for inp in inputs]
+        speaker_index_map: dict[uuid.UUID, int] = {}
+        next_idx = 0
 
-    def _prepare_chat(self, gen_input: GenerationChatInput) -> Chat:
-        normalized_prompt = self.normalize_prompt(gen_input.prompt)
-        system_msg = self.build_system_message(
-            gen_input.scene_description, gen_input.speakers,
-        )
+        for m in messages:
+            if m.speaker and m.speaker.uuid not in speaker_index_map:
+                speaker_index_map[m.speaker.uuid] = next_idx
+                next_idx += 1
 
-        messages: List[Message] = [system_msg]
-        messages.extend(self._build_speaker_audio_pairs(gen_input.speakers))
-        messages.append(
-            Message(role="user", content=TextContent(text=normalized_prompt)),
-        )
+        labels: List[str] = []
+        for m in messages:
+            if m.speaker:
+                labels.append(f"SPEAKER{speaker_index_map[m.speaker.uuid]}")
+            else:
+                labels.append(f"SPEAKER{next_idx}")
+                next_idx += 1
 
-        return Chat(id=gen_input.id, messages=messages)
+        return speaker_index_map, labels
+
+    @staticmethod
+    def _collect_indexed_speakers(
+        messages: List[Message],
+        speaker_index_map: dict,
+    ) -> List[Tuple[int, Speaker]]:
+        """Return ``(index, Speaker)`` pairs ordered by index."""
+        seen: set = set()
+        result: List[Tuple[int, Speaker]] = []
+        for m in messages:
+            if m.speaker and m.speaker.uuid not in seen:
+                seen.add(m.speaker.uuid)
+                result.append((speaker_index_map[m.speaker.uuid], m.speaker))
+        result.sort(key=lambda x: x[0])
+        return result
 
     @staticmethod
     def normalize_prompt(text: str) -> str:
@@ -131,27 +204,48 @@ class InputProcessor:
 
     @staticmethod
     def build_system_message(
-        scene_description: str,
-        speakers: List[Speaker],
+        speakers: List[Tuple[int, Speaker]],
+        system_prompt: Optional[str] = None,
+        scene_description: Optional[str] = None,
+        has_undescribed_speakers: bool = False,
     ) -> Message:
-        """Build a system :class:`Message` with scene description and speaker
-        information.
+        """Build a system :class:`Message`.
 
-        Speakers with an ``audio_url`` get an inline audio placeholder that the
-        tokenizer later expands into audio input tokens.
+        The message is constructed from three optional parts:
+
+        * ``system_prompt`` – free-form instruction text prepended before
+          the scene block.  Falls back to :data:`DEFAULT_SYSTEM_MESSAGE`
+          when not provided.
+        * ``scene_description`` – environment context placed inside the
+          scene descriptor tags.
+        * ``speakers`` – ``(index, Speaker)`` pairs whose descriptions
+          (or audio placeholders for voice-cloning speakers) are appended
+          inside the scene block.
+        * ``has_undescribed_speakers`` – when *True*, an extra instruction
+          is added asking the model to select appropriate voices for
+          speakers that lack a description.
         """
+        base_prompt = system_prompt if system_prompt is not None else DEFAULT_SYSTEM_MESSAGE
+
         speaker_lines = []
-        for speaker in speakers:
+        for idx, speaker in speakers:
+            label = f"SPEAKER{idx}"
             if speaker.audio_url:
-                speaker_lines.append(f"{speaker.name}: {AUDIO_PLACEHOLDER_TOKEN}")
+                speaker_lines.append(f"{label}: {AUDIO_PLACEHOLDER_TOKEN}")
             else:
-                speaker_lines.append(f"{speaker.name}: {speaker.description}")
+                speaker_lines.append(f"{label}: {speaker.description}")
+
+        if has_undescribed_speakers:
+            speaker_lines.append(
+                "Some speakers do not have a voice description. "
+                "Select an appropriate and distinct voice for each of them."
+            )
 
         system_text = "\n".join([
-            DEFAULT_SYSTEM_MESSAGE,
+            base_prompt,
             "",
             SCENE_DESC_START,
-            scene_description,
+            scene_description or "",
             "",
             "\n".join(speaker_lines),
             SCENE_DESC_END,
@@ -173,14 +267,17 @@ class InputProcessor:
         return Message(role="system", content=content_parts)
 
     @staticmethod
-    def _build_speaker_audio_pairs(speakers: List[Speaker]) -> List[Message]:
+    def _build_speaker_audio_pairs(
+        speakers: List[Tuple[int, Speaker]],
+    ) -> List[Message]:
         """Create user/assistant message pairs for speakers with reference audio."""
         pairs: List[Message] = []
-        for speaker in speakers:
+        for idx, speaker in speakers:
             if speaker.audio_url:
+                label = f"SPEAKER{idx}"
                 pairs.append(Message(
                     role="user",
-                    content=TextContent(text=f"{speaker.name}: {speaker.description}"),
+                    content=TextContent(text=f"{label}: {speaker.description}"),
                 ))
                 pairs.append(Message(
                     role="assistant",
@@ -189,57 +286,56 @@ class InputProcessor:
         return pairs
 
     # =====================================================================
-    # Stage 2: Tokenization  (Chat → HiggsAudioModelInput)
+    # Stage 2: Tokenization  (GenerationInput → HiggsAudioModelInput)
     # =====================================================================
 
-    def process_inputs(self, chats: List[Chat]) -> List[HiggsAudioModelInput]:
-        """Batch process a list of chats."""
-        return [self.process_input(chat) for chat in chats]
+    def process_inputs(self, inputs: List[GenerationInput]) -> List[HiggsAudioModelInput]:
+        """Prepare and tokenize multiple GenerationInputs."""
+        return [self.process_input(inp) for inp in inputs]
 
-    def process_input(self, chat: Chat) -> HiggsAudioModelInput:
-        """Process a single chat into a model-ready input."""
-        # 1. Tokenize Text & Collect Audio Content
-        input_tokens = []
-        label_tokens = []
-        audio_contents = []
-        
+    def process_input(self, gen_input: GenerationInput) -> HiggsAudioModelInput:
+        """Prepare and tokenize a GenerationInput into a model-ready input.
+
+        Calls :meth:`prepare` to build the internal message list, then
+        tokenizes the result.
+        """
+        messages = self.prepare(gen_input)
+        input_tokens: List[int] = []
+        label_tokens: List[int] = []
+        audio_contents: List[AudioContent] = []
+        start_index: Optional[int] = None  # None = predict labels for all assistant turns
+
         try:
-            for turn_id, message in enumerate[Message](chat.messages):
-                # A. Role Headers
+            for turn_id, message in enumerate(messages):
                 role_prefix_tokens = self._tokenize_role_prefix(message.role, turn_id, self.text_tokenizer)
                 input_tokens.extend(role_prefix_tokens)
                 label_tokens.extend([-100] * len(role_prefix_tokens))
 
-                # B. Recipient Handling
                 recipient_tokens = self._tokenize_recipient(message, self.text_tokenizer)
                 if recipient_tokens:
                     input_tokens.extend(recipient_tokens)
                     label_tokens.extend(recipient_tokens)
 
-                # C. Content Processing (Text & Audio)
                 content_in, content_label, turn_audio = self._process_message_content(
-                    message, chat, turn_id
+                    message, messages, turn_id, start_index
                 )
                 input_tokens.extend(content_in)
                 label_tokens.extend(content_label)
                 audio_contents.extend(turn_audio)
 
-                # D. Termination
-                termination_tokens = self._tokenize_termination(message, chat, turn_id, self.text_tokenizer)
+                termination_tokens = self._tokenize_termination(message, messages, turn_id, self.text_tokenizer)
                 input_tokens.extend(termination_tokens)
-                # Apply teacher forcing for termination tokens
-                start_index = getattr(chat, "start_index", None)
                 if message.role == "assistant" and (start_index is None or turn_id >= start_index):
                     label_tokens.extend(termination_tokens)
                 else:
                     label_tokens.extend([-100] * len(termination_tokens))
 
         except Exception as e:
-            print(f"Error processing chat messages: {str(e)}")
-            raise ValueError("Failed to process chat sample tokens") from e
+            print(f"Error processing messages: {str(e)}")
+            raise ValueError("Failed to process message tokens") from e
 
         if not input_tokens:
-             raise ValueError("Chat produced no tokens")
+            raise ValueError("Messages produced no tokens")
 
         # 3. Audio Processing
         # Bulk process all collected audio content
@@ -364,16 +460,19 @@ class InputProcessor:
         return []
 
     def _process_message_content(
-        self, message: Message, chat: Chat, turn_id: int
+        self,
+        message: Message,
+        messages: List[Message],
+        turn_id: int,
+        start_index: Optional[int] = None,
     ) -> Tuple[List[int], List[int], List[AudioContent]]:
-        """Process message content: text and audio with teacher forcing (step 5: Content processing, step 6: Label generation)."""
-        input_tokens = []
-        label_tokens = []
-        audio_contents = []
-        
+        """Process message content: text and audio with teacher forcing."""
+        input_tokens: List[int] = []
+        label_tokens: List[int] = []
+        audio_contents: List[AudioContent] = []
+
         role = message.role
         content = message.content
-        start_index = getattr(chat, "start_index", None)
         
         # Normalize content to list
         content_list = []
@@ -428,20 +527,16 @@ class InputProcessor:
         return input_tokens, label_tokens, audio_contents
 
     def _tokenize_termination(
-        self, message: Message, chat: Chat, turn_id: int, tokenizer: AutoTokenizer
+        self,
+        message: Message,
+        messages: List[Message],
+        turn_id: int,
+        tokenizer: AutoTokenizer,
     ) -> List[int]:
-        """Tokenize termination tokens (step 8: Message termination).
-        
-        Note: The caller should apply teacher forcing to the returned tokens when adding to label_tokens.
-        """
-        role = message.role
-        total_m = len(chat.messages)
+        """Tokenize termination tokens."""
         next_id = turn_id + 1
-        
-        # Determine termination token type
-        if role == "assistant" and next_id < total_m and chat.messages[next_id].role == "assistant":
+        if message.role == "assistant" and next_id < len(messages) and messages[next_id].role == "assistant":
             termination_text = EOM_ID
         else:
             termination_text = EOT_ID
-        
         return tokenizer.encode(termination_text, add_special_tokens=False)

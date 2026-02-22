@@ -1,4 +1,3 @@
-# mypy: ignore-errors
 from google.protobuf.internal import containers as _containers
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -28,81 +27,44 @@ class SamplingParams(_message.Message):
     def __init__(self, temperature: _Optional[float] = ..., top_p: _Optional[float] = ..., top_k: _Optional[int] = ..., max_tokens: _Optional[int] = ..., seed: _Optional[int] = ..., ras_win_len: _Optional[int] = ..., ras_win_max_num_repeat: _Optional[int] = ..., force_audio_gen: bool = ...) -> None: ...
 
 class Speaker(_message.Message):
-    __slots__ = ("name", "description", "audio_url")
-    NAME_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ("uuid", "description", "audio_url")
+    UUID_FIELD_NUMBER: _ClassVar[int]
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     AUDIO_URL_FIELD_NUMBER: _ClassVar[int]
-    name: str
+    uuid: str
     description: str
     audio_url: str
-    def __init__(self, name: _Optional[str] = ..., description: _Optional[str] = ..., audio_url: _Optional[str] = ...) -> None: ...
+    def __init__(self, uuid: _Optional[str] = ..., description: _Optional[str] = ..., audio_url: _Optional[str] = ...) -> None: ...
 
-class TextContent(_message.Message):
-    __slots__ = ("text", "type")
+class InputMessage(_message.Message):
+    __slots__ = ("text", "speaker")
     TEXT_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    text: str
-    type: str
-    def __init__(self, text: _Optional[str] = ..., type: _Optional[str] = ...) -> None: ...
-
-class AudioContent(_message.Message):
-    __slots__ = ("audio_url", "raw_audio", "type")
-    AUDIO_URL_FIELD_NUMBER: _ClassVar[int]
-    RAW_AUDIO_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    audio_url: str
-    raw_audio: str
-    type: str
-    def __init__(self, audio_url: _Optional[str] = ..., raw_audio: _Optional[str] = ..., type: _Optional[str] = ...) -> None: ...
-
-class MessageContent(_message.Message):
-    __slots__ = ("text", "audio")
-    TEXT_FIELD_NUMBER: _ClassVar[int]
-    AUDIO_FIELD_NUMBER: _ClassVar[int]
-    text: TextContent
-    audio: AudioContent
-    def __init__(self, text: _Optional[_Union[TextContent, _Mapping]] = ..., audio: _Optional[_Union[AudioContent, _Mapping]] = ...) -> None: ...
-
-class Message(_message.Message):
-    __slots__ = ("role", "content", "recipient", "speaker")
-    ROLE_FIELD_NUMBER: _ClassVar[int]
-    CONTENT_FIELD_NUMBER: _ClassVar[int]
-    RECIPIENT_FIELD_NUMBER: _ClassVar[int]
     SPEAKER_FIELD_NUMBER: _ClassVar[int]
-    role: str
-    content: MessageContent
-    recipient: str
+    text: str
     speaker: Speaker
-    def __init__(self, role: _Optional[str] = ..., content: _Optional[_Union[MessageContent, _Mapping]] = ..., recipient: _Optional[str] = ..., speaker: _Optional[_Union[Speaker, _Mapping]] = ...) -> None: ...
+    def __init__(self, text: _Optional[str] = ..., speaker: _Optional[_Union[Speaker, _Mapping]] = ...) -> None: ...
 
-class Chat(_message.Message):
-    __slots__ = ("id", "messages", "metadata")
-    class MetadataEntry(_message.Message):
-        __slots__ = ("key", "value")
-        KEY_FIELD_NUMBER: _ClassVar[int]
-        VALUE_FIELD_NUMBER: _ClassVar[int]
-        key: str
-        value: str
-        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
-    ID_FIELD_NUMBER: _ClassVar[int]
+class GenerationInput(_message.Message):
+    __slots__ = ("messages", "system_prompt", "scene_description")
     MESSAGES_FIELD_NUMBER: _ClassVar[int]
-    METADATA_FIELD_NUMBER: _ClassVar[int]
-    id: str
-    messages: _containers.RepeatedCompositeFieldContainer[Message]
-    metadata: _containers.ScalarMap[str, str]
-    def __init__(self, id: _Optional[str] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    SYSTEM_PROMPT_FIELD_NUMBER: _ClassVar[int]
+    SCENE_DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    messages: _containers.RepeatedCompositeFieldContainer[InputMessage]
+    system_prompt: str
+    scene_description: str
+    def __init__(self, messages: _Optional[_Iterable[_Union[InputMessage, _Mapping]]] = ..., system_prompt: _Optional[str] = ..., scene_description: _Optional[str] = ...) -> None: ...
 
 class GenerateRequest(_message.Message):
-    __slots__ = ("request_id", "chats", "sampling_params", "stream")
+    __slots__ = ("request_id", "inputs", "sampling_params", "stream")
     REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
-    CHATS_FIELD_NUMBER: _ClassVar[int]
+    INPUTS_FIELD_NUMBER: _ClassVar[int]
     SAMPLING_PARAMS_FIELD_NUMBER: _ClassVar[int]
     STREAM_FIELD_NUMBER: _ClassVar[int]
     request_id: str
-    chats: _containers.RepeatedCompositeFieldContainer[Chat]
+    inputs: _containers.RepeatedCompositeFieldContainer[GenerationInput]
     sampling_params: SamplingParams
     stream: bool
-    def __init__(self, request_id: _Optional[str] = ..., chats: _Optional[_Iterable[_Union[Chat, _Mapping]]] = ..., sampling_params: _Optional[_Union[SamplingParams, _Mapping]] = ..., stream: bool = ...) -> None: ...
+    def __init__(self, request_id: _Optional[str] = ..., inputs: _Optional[_Iterable[_Union[GenerationInput, _Mapping]]] = ..., sampling_params: _Optional[_Union[SamplingParams, _Mapping]] = ..., stream: bool = ...) -> None: ...
 
 class GenerateResponse(_message.Message):
     __slots__ = ("chunk", "complete")

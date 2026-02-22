@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Inference engine gRPC server.
 
-Exposes the AsyncLLMEngine over gRPC so clients can send inference requests
+Exposes the AudioEngine over gRPC so clients can send generation requests
 and stream responses. Supports graceful shutdown on SIGINT/SIGTERM.
 
 Run:
@@ -17,16 +17,14 @@ import logging
 import os
 import signal
 import sys
-import time
 
 import grpc
 
 from inference_grpc import inference_engine_pb2 as pb2
 from inference_grpc import inference_engine_pb2_grpc as pb2_grpc
 
-from model_config import model_config
-from src.engine import AsyncLLMEngine
-from src.engine.servicer import InferenceEngineServicer
+from src.generation.engine import AudioEngine
+from src.generation.engine_servicer import InferenceEngineServicer
 
 logger = logging.getLogger(__name__)
 
@@ -64,25 +62,14 @@ def enable_reflection(server: grpc.aio.Server) -> None:
         logger.info("gRPC reflection disabled (pip install grpcio-reflection)")
 
 
-async def shutdown_engine(engine: AsyncLLMEngine) -> None:
-    """Call the engine's shutdown hook if present (async or sync)."""
-    shutdown = getattr(engine, "shutdown", None)
-    if not shutdown:
-        return
-    if asyncio.iscoroutinefunction(shutdown):
-        await shutdown()
-    else:
-        shutdown()
-
-
 # ---------------------------------------------------------------------------
 # gRPC server lifecycle
 # ---------------------------------------------------------------------------
 
 
-async def serve(engine: AsyncLLMEngine, host: str, port: int) -> None:
-    """Run the gRPC server until SIGINT or SIGTERM; then stop server and engine."""
-    servicer = InferenceEngineServicer(engine, start_time=time.time())
+async def serve(engine: AudioEngine, host: str, port: int) -> None:
+    """Run the gRPC server until SIGINT or SIGTERM; then stop gracefully."""
+    servicer = InferenceEngineServicer(engine)
     server = grpc.aio.server(
         options=[
             ("grpc.max_send_message_length", -1),
@@ -97,7 +84,6 @@ async def serve(engine: AsyncLLMEngine, host: str, port: int) -> None:
     await server.start()
     logger.info("Inference gRPC server started on %s", address)
 
-    # Block until we receive SIGINT or SIGTERM
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -108,7 +94,6 @@ async def serve(engine: AsyncLLMEngine, host: str, port: int) -> None:
     finally:
         logger.info("Shutting down gRPC server …")
         await server.stop(grace=5.0)
-        await shutdown_engine(engine)
         logger.info("Shutdown complete")
 
 
@@ -118,25 +103,21 @@ async def serve(engine: AsyncLLMEngine, host: str, port: int) -> None:
 
 
 def main() -> None:
-    """Parse args, configure logging and engine, then run the gRPC server."""
+    """Parse args, build the AudioEngine, then run the gRPC server."""
     args = build_parser().parse_args()
     logging.basicConfig(
         level=getattr(logging, args.log_level),
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
-    logger.info(
-        "Configuring engine (model=%s, cache_dir=%s) …",
-        model_config.model_name_or_path,
-        model_config.model_cache_dir,
-    )
-    engine = AsyncLLMEngine(model_config=model_config)
+    engine = AudioEngine()
 
     try:
         asyncio.run(serve(engine, host=args.host, port=args.port))
     except Exception:
         logger.exception("Server failed")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
